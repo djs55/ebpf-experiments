@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	rootCgroup = "/sys/fs/cgroup/unified"
 	ebpfFS     = "/sys/fs/bpf"
 	accMapName = "acc_map"
 )
