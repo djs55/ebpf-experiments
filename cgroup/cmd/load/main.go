@@ -49,7 +49,19 @@ func main() {
 		panic(err)
 	}
 
-	/* None of the resources are explicitly pinned so will be unloaded
+	m, ok := c.Maps["blocked_map"]
+	if !ok {
+		panic("unable to find blocked_map")
+	}
+	if err := os.Remove("/sys/fs/bpf/blocked_map"); err != nil && !os.IsNotExist(err) {
+		panic(err)
+	}
+	if err := m.Pin("/sys/fs/bpf/blocked_map"); err != nil {
+		panic(err)
+	}
+	fmt.Println("blocked_map is pinned to /sys/fs/bpf/blocked_map")
+
+	/* The link to the cgroup is not pinned so will be disconnected
 	   when the program exits and the refcounts decrease. */
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
