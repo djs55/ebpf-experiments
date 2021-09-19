@@ -12,6 +12,20 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var (
+	// Paths to pin objects in /sys/fs/bpf:
+	ingressProgramPath    = "/sys/fs/bpf/ingress_program"
+	ingressCgroupLinkPath = "/sys/fs/bpf/ingress_cgroup_link"
+	egressProgramPath     = "/sys/fs/bpf/egress_program"
+	egressCgroupLinkPath  = "/sys/fs/bpf/egress_cgroup_link"
+	blockedMapPath        = "/sys/fs/bpf/blocked_map"
+
+	// Symbols from bpf.c
+	ingressProgram = "ingress"
+	egressProgram  = "egress"
+	blockedMap     = "blocked_map"
+)
+
 func main() {
 	cgroup := flag.String("cgroup", "/sys/fs/cgroup", "cgroup to attach ingress/egress hooks to")
 	bpf := flag.String("bpf", "bpf/bpf.o", "path to compiled eBPF code")
@@ -27,39 +41,39 @@ func main() {
 		panic(err)
 	}
 
-	cg, err := os.Open(*cgroup)
+	if err := c.Programs[ingressProgram].Pin(ingressProgramPath); err != nil{
+		panic(err)
+	}
+	l, err := link.AttachCgroup(link.CgroupOptions{
+		Path:    *cgroup,
+		Attach:  ebpf.AttachCGroupInetIngress,
+		Program: c.Programs[ingressProgram],
+	})
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Printf("attaching ingress to cgroup %s\n", cg.Name())
-	if _, err = link.AttachCgroup(link.CgroupOptions{
-		Path:    cg.Name(),
-		Attach:  ebpf.AttachCGroupInetIngress,
-		Program: c.Programs["ingress"],
-	}); err != nil {
+	if err := l.Pin(ingressCgroupLinkPath); err != nil {
 		panic(err)
 	}
-	fmt.Printf("attaching egress to cgroup %s\n", cg.Name())
-	if _, err := link.AttachCgroup(link.CgroupOptions{
-		Path:    cg.Name(),
+
+	if err := c.Programs[egressProgram].Pin(egressProgramPath); err != nil{
+		panic(err)
+	}
+	l, err = link.AttachCgroup(link.CgroupOptions{
+		Path:    *cgroup,
 		Attach:  ebpf.AttachCGroupInetEgress,
-		Program: c.Programs["egress"],
-	}); err != nil {
+		Program: c.Programs[egressProgram],
+	})
+	if err != nil {
+		panic(err)
+	}
+	if err := l.Pin(egressCgroupLinkPath); err != nil {
 		panic(err)
 	}
 
-	m, ok := c.Maps["blocked_map"]
-	if !ok {
-		panic("unable to find blocked_map")
-	}
-	if err := os.Remove("/sys/fs/bpf/blocked_map"); err != nil && !os.IsNotExist(err) {
+	if err := c.Maps[blockedMap].Pin(blockedMapPath); err != nil {
 		panic(err)
 	}
-	if err := m.Pin("/sys/fs/bpf/blocked_map"); err != nil {
-		panic(err)
-	}
-	fmt.Println("blocked_map is pinned to /sys/fs/bpf/blocked_map")
 
 	/* The link to the cgroup is not pinned so will be disconnected
 	   when the program exits and the refcounts decrease. */
@@ -67,4 +81,17 @@ func main() {
 	signal.Notify(sigc, syscall.SIGINT, syscall.SIGTERM)
 	fmt.Println("eBPF loaded and active. Hit Control+C to unload and exit.")
 	<-sigc
+
+	if err := os.Remove(ingressProgramPath); err != nil {
+		fmt.Printf("removing %s: %v\n", ingressProgramPath, err)
+	}
+	if err := os.Remove(egressProgramPath); err != nil {
+		fmt.Printf("removing %s: %v\n", egressProgramPath, err)
+	}
+	if err := os.Remove(ingressCgroupLinkPath); err != nil {
+		fmt.Printf("removing %s: %v\n", ingressCgroupLinkPath, err)
+	}
+	if err := os.Remove(blockedMapPath); err != nil {
+		fmt.Printf("removing %s: %v\n", blockedMapPath, err)
+	}
 }
