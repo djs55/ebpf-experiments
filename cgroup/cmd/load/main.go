@@ -91,6 +91,9 @@ func main() {
 	if err := os.Remove(ingressCgroupLinkPath); err != nil {
 		fmt.Printf("removing %s: %v\n", ingressCgroupLinkPath, err)
 	}
+	if err := os.Remove(egressCgroupLinkPath); err != nil {
+		fmt.Printf("removing %s: %v\n", egressCgroupLinkPath, err)
+	}
 	if err := os.Remove(blockedMapPath); err != nil {
 		fmt.Printf("removing %s: %v\n", blockedMapPath, err)
 	}
