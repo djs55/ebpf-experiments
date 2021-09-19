@@ -16,7 +16,7 @@ func main() {
 		fmt.Println("   -- add <IP> to the blocklist")
 		os.Exit(1)
 	}
-	ip := binary.LittleEndian.Uint32(net.ParseIP(os.Args[1]))
+	ip := binary.LittleEndian.Uint32(net.ParseIP(os.Args[1]).To4())
 	m, err := ebpf.LoadPinnedMap("/sys/fs/bpf/blocked_map", &ebpf.LoadPinOptions{})
 	if err != nil {
 		panic(err)
