@@ -15,9 +15,7 @@ import (
 var (
 	// Paths to pin objects in /sys/fs/bpf:
 	ingressProgramPath    = "/sys/fs/bpf/ingress_program"
-	ingressCgroupLinkPath = "/sys/fs/bpf/ingress_cgroup_link"
 	egressProgramPath     = "/sys/fs/bpf/egress_program"
-	egressCgroupLinkPath  = "/sys/fs/bpf/egress_cgroup_link"
 	blockedMapPath        = "/sys/fs/bpf/blocked_map"
 
 	// Symbols from bpf.c
@@ -44,30 +42,22 @@ func main() {
 	if err := c.Programs[ingressProgram].Pin(ingressProgramPath); err != nil{
 		panic(err)
 	}
-	l, err := link.AttachCgroup(link.CgroupOptions{
+	if _, err = link.AttachCgroup(link.CgroupOptions{
 		Path:    *cgroup,
 		Attach:  ebpf.AttachCGroupInetIngress,
 		Program: c.Programs[ingressProgram],
-	})
-	if err != nil {
-		panic(err)
-	}
-	if err := l.Pin(ingressCgroupLinkPath); err != nil {
+	}); err != nil {
 		panic(err)
 	}
 
 	if err := c.Programs[egressProgram].Pin(egressProgramPath); err != nil{
 		panic(err)
 	}
-	l, err = link.AttachCgroup(link.CgroupOptions{
+	if _, err := link.AttachCgroup(link.CgroupOptions{
 		Path:    *cgroup,
 		Attach:  ebpf.AttachCGroupInetEgress,
 		Program: c.Programs[egressProgram],
-	})
-	if err != nil {
-		panic(err)
-	}
-	if err := l.Pin(egressCgroupLinkPath); err != nil {
+	}); err != nil {
 		panic(err)
 	}
 
@@ -87,12 +77,6 @@ func main() {
 	}
 	if err := os.Remove(egressProgramPath); err != nil {
 		fmt.Printf("removing %s: %v\n", egressProgramPath, err)
-	}
-	if err := os.Remove(ingressCgroupLinkPath); err != nil {
-		fmt.Printf("removing %s: %v\n", ingressCgroupLinkPath, err)
-	}
-	if err := os.Remove(egressCgroupLinkPath); err != nil {
-		fmt.Printf("removing %s: %v\n", egressCgroupLinkPath, err)
 	}
 	if err := os.Remove(blockedMapPath); err != nil {
 		fmt.Printf("removing %s: %v\n", blockedMapPath, err)
